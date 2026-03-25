@@ -16,18 +16,26 @@
         <p>Can you untangle the graph?  See if you can position the vertices so that no two lines cross.
         <p>Number of line crossings detected: <span id="count">0</span> | <span style="font-style: italic"><span id="move-count">0 moves</span> taken in <span id="timer">0</span>s.</span>
       </div>
-      <div id="controls" style="padding: 20px; border-left: 1px solid #ccc; min-width: 300px;">
-        <p><label for="nodes">Number of vertices:</label>
-          <input type="number" value="50" id="nodes" min="4">
-        <p><label for="canvas-width">Canvas width:</label>
-          <input type="number" value="1000" id="canvas-width" min="800" max="10000">
-        <p><label for="canvas-height">Canvas height:</label>
-          <input type="number" value="600" id="canvas-height" min="600" max="10000">
-        <p><button id="generate" class="first last">Generate new, random graph</button>
-        <p><button id="save" class="first">Save Game</button>
-          <button id="load">Load Game</button>
-        <p><button id="resume" class="first last">Resume Last Game</button>
-        <p><label for="intersections"><input type="checkbox" id="intersections" checked> Highlight non-intersecting lines</label>.
+      <div id="controls" style="padding: 20px; border-left: 1px solid #ccc;">
+        <p style="display: flex; align-items: center; gap: 12px;">
+          <label for="nodes">Vertices: <input type="number" value="50" id="nodes" min="4" style="width: 60px;"></label>
+          <label for="canvas-width">Width: <input type="number" value="1000" id="canvas-width" min="800" max="10000" style="width: 70px;"></label>
+          <label for="canvas-height">Height: <input type="number" value="600" id="canvas-height" min="600" max="10000" style="width: 70px;"></label>
+        </p>
+        <p style="display: flex; align-items: center; gap: 8px;">
+          <button id="generate">New</button>
+          <input type="text" id="save-name" placeholder="save name" style="width: 100px;">
+          <button id="save">Save</button>
+          <select id="save-list"></select>
+          <button id="load">Load</button>
+          <button id="resume">Resume</button>
+          <button id="delete">Delete</button>
+        </p>
+        <p style="display: flex; align-items: center; gap: 8px;">
+          <span>Step:</span>
+          <button id="step-centroid">Centroid</button>
+        </p>
+        <p><label for="intersections"><input type="checkbox" id="intersections" checked> Highlight non-intersecting lines</label>.</p>
       </div>
     </div>
     <div id="vis"><img src="planarity.png"></div>

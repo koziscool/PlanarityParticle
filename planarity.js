@@ -208,16 +208,16 @@ function cross(a, b) {
   return a[0] * b[1] - a[1] * b[0];
 }
 
-// Save game state to localStorage
-function saveGame() {
-  var state = {
+function saveKey() {
+  var name = d3.select("#save-name").property("value").trim();
+  return name ? 'planarity_' + name : 'planarityGame';
+}
+
+function buildState() {
+  return {
     nodes: graph.nodes,
     links: graph.links.map(function(link) {
-      // Store links as indices to avoid circular references
-      return [
-        graph.nodes.indexOf(link[0]),
-        graph.nodes.indexOf(link[1])
-      ];
+      return [graph.nodes.indexOf(link[0]), graph.nodes.indexOf(link[1])];
     }),
     moves: moves,
     startTime: start,
@@ -226,88 +226,112 @@ function saveGame() {
     canvasWidth: w,
     canvasHeight: h
   };
-  localStorage.setItem('planarityGame', JSON.stringify(state));
-  alert('Game saved!');
 }
 
-// Load game state from localStorage
-function loadGame() {
-  var savedState = localStorage.getItem('planarityGame');
-  if (!savedState) {
-    alert('No saved game found!');
-    return false;
-  }
-
-  var state = JSON.parse(savedState);
-
-  // Reconstruct the graph
+function restoreState(state) {
   graph = {
     nodes: state.nodes,
     links: state.links.map(function(linkIndices) {
       return [state.nodes[linkIndices[0]], state.nodes[linkIndices[1]]];
     })
   };
-
-  // Restore game state
   moves = state.moves;
   start = state.startTime;
   highlightIntersections = state.highlightIntersections;
   d3.select("#nodes").property("value", state.nodeCount);
   d3.select("#intersections").property("checked", highlightIntersections);
-
-  // Restore canvas dimensions
   if (state.canvasWidth && state.canvasHeight) {
     d3.select("#canvas-width").property("value", state.canvasWidth);
     d3.select("#canvas-height").property("value", state.canvasHeight);
     resizeCanvas();
   }
-
   moveCounter.text(moves + " move" + (moves !== 1 ? "s" : ""));
   update();
+}
 
+function saveGame() {
+  localStorage.setItem(saveKey(), JSON.stringify(buildState()));
+}
+
+function loadGame(key) {
+  var savedState = localStorage.getItem(key || saveKey());
+  if (!savedState) { alert('No saved game found!'); return false; }
+  restoreState(JSON.parse(savedState));
   return true;
 }
 
-// Check for saved game on load
-function checkForSavedGame() {
-  return localStorage.getItem('planarityGame') !== null;
+function deleteGame() {
+  var key = saveKey();
+  if (localStorage.getItem(key)) {
+    localStorage.removeItem(key);
+  } else {
+    alert('No saved game found!');
+  }
 }
 
 // Auto-save on every move
 var originalUpdate = update;
 update = function() {
   originalUpdate();
-  // Auto-save after each update
-  if (moves > 0) {
-    var state = {
-      nodes: graph.nodes,
-      links: graph.links.map(function(link) {
-        return [
-          graph.nodes.indexOf(link[0]),
-          graph.nodes.indexOf(link[1])
-        ];
-      }),
-      moves: moves,
-      startTime: start,
-      nodeCount: +d3.select("#nodes").property("value"),
-      highlightIntersections: highlightIntersections,
-      canvasWidth: w,
-      canvasHeight: h
-    };
-    localStorage.setItem('planarityGame', JSON.stringify(state));
-  }
+  if (moves > 0) localStorage.setItem('planarityGame', JSON.stringify(buildState()));
 };
 
-// Wire up save/load buttons
-d3.select("#save").on("click", saveGame);
-d3.select("#load").on("click", function() {
-  if (loadGame()) {
-    alert('Game loaded!');
+// Step functions
+function stepCentroid() {
+  var maxDist = -1, target = null, targetPos = null;
+  graph.nodes.forEach(function(node) {
+    var neighbors = graph.links
+      .filter(function(l) { return l[0] === node || l[1] === node; })
+      .map(function(l) { return l[0] === node ? l[1] : l[0]; });
+    if (!neighbors.length) return;
+    var cx = neighbors.reduce(function(s, n) { return s + n[0]; }, 0) / neighbors.length;
+    var cy = neighbors.reduce(function(s, n) { return s + n[1]; }, 0) / neighbors.length;
+    var dx = node[0] - cx, dy = node[1] - cy;
+    var dist = Math.sqrt(dx * dx + dy * dy);
+    if (dist > maxDist) { maxDist = dist; target = node; targetPos = [cx, cy]; }
+  });
+  if (!target) return;
+  var startPos = [target[0], target[1]];
+  var startTime = Date.now();
+  d3.timer(function() {
+    var t = Math.min((Date.now() - startTime) / 300, 1);
+    t = t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t; // ease in-out
+    target[0] = startPos[0] + (targetPos[0] - startPos[0]) * t;
+    target[1] = startPos[1] + (targetPos[1] - startPos[1]) * t;
+    update();
+    return t >= 1;
+  });
+}
+
+d3.select("#step-centroid").on("click", stepCentroid);
+
+// Wire up buttons
+function refreshSaveList() {
+  var keys = [];
+  for (var i = 0; i < localStorage.length; i++) {
+    var k = localStorage.key(i);
+    if (k === 'planarityGame' || k.indexOf('planarity_') === 0) keys.push(k);
   }
+  var sel = d3.select("#save-list");
+  sel.selectAll("option").remove();
+  sel.append("option").attr("value", "").text("-- saves --");
+  keys.forEach(function(k) {
+    sel.append("option").attr("value", k).text(k === 'planarityGame' ? '(auto)' : k.replace('planarity_', ''));
+  });
+}
+
+refreshSaveList();
+
+d3.select("#save").on("click", function() { saveGame(); refreshSaveList(); });
+d3.select("#load").on("click", function() {
+  var key = d3.select("#save-list").property("value");
+  if (!key) { alert('Select a save first!'); return; }
+  loadGame(key);
 });
+d3.select("#delete").on("click", function() { deleteGame(); refreshSaveList(); });
 d3.select("#resume").on("click", function() {
-  if (checkForSavedGame()) {
-    loadGame();
+  if (localStorage.getItem('planarityGame')) {
+    loadGame('planarityGame');
   } else {
     alert('No saved game to resume!');
   }
